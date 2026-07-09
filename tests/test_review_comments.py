@@ -153,6 +153,59 @@ def test_comment_thread_lifecycle(client, app_config):
     assert 'Tino-Meta: true' in repo.head.commit.message
 
 
+def test_comment_reply_can_target_individual_message(client):
+    create_bucket_with_file(client)
+
+    response = client.post('/api/buckets/paper/comments', json=comment_payload())
+
+    assert response.status_code == 201
+    thread = response.json()
+    thread_id = thread['id']
+    first_message_id = thread['messages'][0]['id']
+    assert thread['messages'][0]['reply_to_message_id'] is None
+
+    response = client.post(
+        f'/api/buckets/paper/comments/{thread_id}/replies',
+        json={'body': 'Thread-level reply.'},
+    )
+
+    assert response.status_code == 200
+    thread = response.json()
+    second_message_id = thread['messages'][1]['id']
+    assert thread['messages'][1]['reply_to_message_id'] is None
+
+    response = client.post(
+        f'/api/buckets/paper/comments/{thread_id}/replies',
+        json={
+            'body': 'Replying to the first note.',
+            'reply_to_message_id': first_message_id,
+        },
+    )
+
+    assert response.status_code == 200
+    thread = response.json()
+    assert thread['messages'][2]['reply_to_message_id'] == first_message_id
+
+    response = client.post(
+        f'/api/buckets/paper/comments/{thread_id}/replies',
+        json={'body': 'Stale target.', 'reply_to_message_id': 'missing-message'},
+    )
+
+    assert response.status_code == 404
+    assert response.json()['detail'] == 'Message not found'
+
+    response = client.get('/api/buckets/paper/comments?path=main.typ')
+
+    assert response.status_code == 200
+    thread = response.json()[0]
+    assert [message['reply_to_message_id'] for message in thread['messages']] == [
+        None,
+        None,
+        first_message_id,
+    ]
+    assert [message['id'] for message in thread['messages']][1] == second_message_id
+
+
 def test_comment_rejects_invalid_anchor_path(client):
     create_bucket_with_file(client)
 

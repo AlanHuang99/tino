@@ -1,3 +1,6 @@
+const REPLY_CONTEXT_LENGTH = 90
+const ELLIPSIS_WIDTH = 1
+
 export const el = function el(tag, className, text = null) {
   const node = document.createElement(tag)
   if (className)
@@ -9,12 +12,49 @@ export const el = function el(tag, className, text = null) {
 
 const formatWhen = value => value ? new Date(value).toLocaleString() : ''
 
-const messageNode = function messageNode(message) {
-  const node = el('div', 'review-message')
+const shortenBody = function shortenBody(body) {
+  if (body.length <= REPLY_CONTEXT_LENGTH)
+    return body
+  return `${body.slice(0, REPLY_CONTEXT_LENGTH - ELLIPSIS_WIDTH)}...`
+}
+
+const replyContextText = function replyContextText(message) {
+  if (!message)
+    return 'Replying to an earlier message'
+  return `Replying to ${message.author}: ${shortenBody(message.body)}`
+}
+
+const targetReplyButton = function targetReplyButton(messageId) {
+  const button = el('button', 'review-message-action', 'Reply')
+  button.type = 'button'
+  button.dataset.reviewAction = 'target-reply'
+  button.dataset.reviewMessage = messageId
+  return button
+}
+
+const messageHeader = function messageHeader(message, canReply) {
+  const header = el('div', 'review-message-header')
   const meta = el(
     'div', 'review-message-meta', `${message.author} · ${formatWhen(message.created_at)}`,
   )
-  node.append(meta, el('div', 'review-message-body', message.body))
+  header.appendChild(meta)
+  if (canReply)
+    header.appendChild(targetReplyButton(message.id))
+  return header
+}
+
+const messageParentNode = function messageParentNode(message, messagesById) {
+  const target = messagesById.get(message.reply_to_message_id)
+  return el('div', 'review-message-parent', replyContextText(target))
+}
+
+const messageNode = function messageNode(message, messagesById, canReply) {
+  const node = el('div', 'review-message')
+  node.dataset.message = message.id
+  node.appendChild(messageHeader(message, canReply))
+  if (message.reply_to_message_id)
+    node.appendChild(messageParentNode(message, messagesById))
+  node.appendChild(el('div', 'review-message-body', message.body))
   return node
 }
 
@@ -45,23 +85,44 @@ const threadHeader = function threadHeader(thread, canEdit, openStatus) {
   return header
 }
 
-const messagesNode = function messagesNode(thread) {
-  const messages = el('div', 'review-messages')
-  for (const message of thread.messages)
-    messages.appendChild(messageNode(message))
-  return messages
+const replyContextNode = function replyContextNode() {
+  const context = el('div', 'review-reply-context hidden')
+  const label = el('span', 'review-reply-context-text')
+  const clear = el('button', 'review-message-action', 'Cancel')
+  clear.type = 'button'
+  clear.dataset.reviewAction = 'cancel-target-reply'
+  context.append(label, clear)
+  return context
+}
+
+const replyInput = function replyInput() {
+  const input = el('textarea', 'form-input review-reply-input')
+  input.rows = 2
+  input.placeholder = 'Reply...'
+  return input
+}
+
+const replyButton = function replyButton() {
+  const button = el('button', 'btn btn-secondary btn-small review-reply-button', 'Reply')
+  button.type = 'button'
+  button.dataset.reviewAction = 'reply'
+  return button
 }
 
 const replyNode = function replyNode() {
   const reply = el('div', 'review-reply')
-  const input = el('textarea', 'form-input review-reply-input')
-  const button = el('button', 'btn btn-secondary btn-small review-reply-button', 'Reply')
-  input.rows = 2
-  input.placeholder = 'Reply...'
-  button.type = 'button'
-  button.dataset.reviewAction = 'reply'
-  reply.append(input, button)
+  reply.append(replyContextNode(), replyInput(), replyButton())
   return reply
+}
+
+const messagesNode = function messagesNode(thread, canReply, openStatus) {
+  const messagesById = new Map(thread.messages.map(message => [message.id, message]))
+  const messages = el('div', 'review-messages')
+  for (const message of thread.messages) {
+    const replyAvailable = canReply && thread.status === openStatus
+    messages.appendChild(messageNode(message, messagesById, replyAvailable))
+  }
+  return messages
 }
 
 export const reviewThreadNode = function reviewThreadNode(thread, canEdit, openStatus) {
@@ -70,8 +131,31 @@ export const reviewThreadNode = function reviewThreadNode(thread, canEdit, openS
   item.appendChild(threadHeader(thread, canEdit, openStatus))
   if (thread.anchor.quote)
     item.appendChild(el('blockquote', 'review-quote', thread.anchor.quote))
-  item.appendChild(messagesNode(thread))
+  item.appendChild(messagesNode(thread, canEdit, openStatus))
   if (canEdit && thread.status === openStatus)
     item.appendChild(replyNode())
   return item
+}
+
+const clearReplyTargetView = function clearReplyTargetView(item, label, context) {
+  delete item.dataset.replyTarget
+  label.textContent = ''
+  context.classList.add('hidden')
+}
+
+const applyReplyTargetView = function applyReplyTargetView(item, label, context, message) {
+  item.dataset.replyTarget = message.id
+  label.textContent = replyContextText(message)
+  context.classList.remove('hidden')
+}
+
+export const setReplyTargetView = function setReplyTargetView(item, message) {
+  const context = item.querySelector('.review-reply-context')
+  const label = item.querySelector('.review-reply-context-text')
+  if (!context || !label)
+    return
+  if (message)
+    applyReplyTargetView(item, label, context, message)
+  else
+    clearReplyTargetView(item, label, context)
 }

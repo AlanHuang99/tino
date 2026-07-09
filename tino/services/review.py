@@ -25,6 +25,10 @@ class ReviewThreadNotFound(KeyError):
     '''Raised when a review thread id is not present in the bucket store.'''
 
 
+class ReviewMessageNotFound(KeyError):
+    '''Raised when a reply targets a message id that is not present in its thread.'''
+
+
 class ReviewService:
     '''CRUD operations for hidden, git-backed review comment metadata.'''
 
@@ -106,12 +110,16 @@ class ReviewService:
         return datetime.now(timezone.utc).isoformat()
 
     @staticmethod
-    def _message(body: str, user: User) -> ReviewMessage:
+    def _message(
+        body: str, user: User,
+        reply_to_message_id: str | None = None,
+    ) -> ReviewMessage:
         return ReviewMessage(
             id=uuid4().hex,
             author=user.username,
             body=body.strip(),
             created_at=ReviewService._now(),
+            reply_to_message_id=reply_to_message_id,
         )
 
     @staticmethod
@@ -160,7 +168,13 @@ class ReviewService:
         with self._slug_lock(slug):
             data = self._read_store(slug)
             thread = self._find(data, thread_id)
-            thread['messages'].append(self._message(body.body, user).model_dump())
+            target_id = body.reply_to_message_id
+            message_ids = {message['id'] for message in thread['messages']}
+            if target_id is not None and target_id not in message_ids:
+                raise ReviewMessageNotFound(target_id)
+            thread['messages'].append(
+                self._message(body.body, user, target_id).model_dump(),
+            )
             self._write_store(slug, data, user)
             logger.info('Replied to review thread %s in %s', thread_id, slug)
             return ReviewThread(**thread)

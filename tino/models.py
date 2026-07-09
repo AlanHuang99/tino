@@ -147,6 +147,7 @@ class ReviewMessage(BaseModel):
     author: str
     created_at: str
     body: str
+    reply_to_message_id: str | None = None
 
 
 class ReviewThread(BaseModel):
@@ -172,6 +173,7 @@ class ReviewThreadCreate(BaseModel):
 class ReviewReplyCreate(BaseModel):
     '''Request body for replying to a review thread.'''
     body: str = Field(min_length=1)
+    reply_to_message_id: str | None = None
 
 
 class ReviewThreadUpdate(BaseModel):

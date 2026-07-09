@@ -1,4 +1,4 @@
-import { el, reviewThreadNode } from './review-nodes.js'
+import { el, reviewThreadNode, setReplyTargetView } from './review-nodes.js'
 import { selectReviewRange, setReviewThreads } from './codemirror-review.js'
 import { SINGLE_ITEM } from './constants.js'
 
@@ -148,6 +148,10 @@ export class ReviewManager {
       await this._updateStatus(threadId, 'resolved')
     else if (action === 'reopen')
       await this._updateStatus(threadId, OPEN_STATUS)
+    else if (action === 'target-reply')
+      this._targetReply(threadId, item, button.dataset.reviewMessage)
+    else if (action === 'cancel-target-reply')
+      ReviewManager._clearReplyTarget(item)
     else if (action === 'reply')
       await this._reply(threadId, item)
   }
@@ -162,9 +166,37 @@ export class ReviewManager {
     const body = input.value.trim()
     if (!body)
       return
-    await this.app.api.replyToComment(this.app.bucket, threadId, body)
+    await this.app.api.replyToComment(
+      this.app.bucket, threadId, body, item.dataset.replyTarget || null,
+    )
     input.value = ''
     await this.loadForCurrentFile()
+  }
+
+  _targetReply(threadId, item, messageId) {
+    const message = this._messageFor(threadId, messageId)
+    if (!message)
+      return
+    setReplyTargetView(item, message)
+    ReviewManager._focusReplyInput(item)
+  }
+
+  static _clearReplyTarget(item) {
+    setReplyTargetView(item, null)
+    ReviewManager._focusReplyInput(item)
+  }
+
+  _messageFor(threadId, messageId) {
+    const thread = this.threads.find(candidate => candidate.id === threadId)
+    if (!thread)
+      return null
+    return thread.messages.find(message => message.id === messageId)
+  }
+
+  static _focusReplyInput(item) {
+    const input = item.querySelector('.review-reply-input')
+    if (input)
+      input.focus()
   }
 
   _anchorFromSelection() {

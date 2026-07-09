@@ -1174,10 +1174,48 @@ html, body {
   gap: 8px;
 }
 
+.review-message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.review-message-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .review-message-meta {
   margin-bottom: 2px;
   color: var(--text-muted);
   font-size: 10px;
+}
+
+.review-message-action {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.review-message-action:hover {
+  color: var(--accent);
+}
+
+.review-message-parent,
+.review-reply-context {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.review-message-parent {
+  padding-left: 8px;
+  border-left: 2px solid var(--border-light);
 }
 
 .review-message-body {
@@ -1192,6 +1230,24 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.review-reply-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+}
+
+.review-reply-context-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .review-reply-button {

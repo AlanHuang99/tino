@@ -184,11 +184,14 @@ export class TinoAPI extends GitAPI {
 
   /** Reply to an existing review comment thread. */
 
-  replyToComment(slug, threadId, body) {
+  replyToComment(slug, threadId, body, replyToMessageId = null) {
+    const payload = { body }
+    if (replyToMessageId)
+      payload.reply_to_message_id = replyToMessageId
     return this._json(
       'POST',
       `${bucketPath(slug)}/comments/${encodeURIComponent(threadId)}/replies`,
-      { body },
+      payload,
     )
   }
 

@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..dependencies import get_review_service, require_editor, require_viewer
 from ..models import ReviewReplyCreate, ReviewThread, ReviewThreadCreate, ReviewThreadUpdate
-from ..services.review import ReviewPathError, ReviewService, ReviewThreadNotFound
+from ..services.review import ReviewMessageNotFound, ReviewPathError, ReviewService, \
+    ReviewThreadNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,12 @@ async def reply_to_comment(
     '''Append a reply to an existing review thread.'''
     try:
         return svc.reply(slug, thread_id, body, user)
+    except ReviewMessageNotFound as exc:
+        logger.warning(
+            'Reply rejected for missing review message %s in %s/%s',
+            body.reply_to_message_id, slug, thread_id,
+        )
+        raise HTTPException(404, 'Message not found') from exc
     except ReviewThreadNotFound as exc:
         logger.warning('Reply rejected for missing review thread %s in %s', thread_id, slug)
         raise HTTPException(404, 'Comment not found') from exc
